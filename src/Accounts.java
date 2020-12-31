@@ -30,4 +30,12 @@ public class Accounts implements Serializable {
         fos.close();
     }
 
+    public static Accounts deserialize(String filepath) throws IOException, ClassNotFoundException {
+        FileInputStream fis = new FileInputStream(filepath);
+        ObjectInputStream ois = new ObjectInputStream(fis);
+        Accounts accounts = (Accounts) ois.readObject();
+        ois.close();
+        fis.close();
+        return accounts;
+    }
 }

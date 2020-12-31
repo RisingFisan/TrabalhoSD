@@ -1,8 +1,10 @@
+import java.io.*;
 import java.util.*;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class Locations {
+public class Locations implements Serializable{
 
     public static class Position {
         public int x;
@@ -54,6 +56,7 @@ public class Locations {
 
     private HashMap<Position, HashSet<String>> currentPositions;
     private HashMap<Position, ArrayList<String>> history;
+    public ReentrantReadWriteLock l = new ReentrantReadWriteLock();
 
     public Locations() {
         this.currentPositions = new HashMap<>();
@@ -65,6 +68,8 @@ public class Locations {
         for (Position pos : this.currentPositions.keySet()) {
             if (this.currentPositions.get(pos).remove(username)) {
                 oldPos = pos;
+                if (this.currentPositions.get(pos).size() == 0)
+                    this.currentPositions.remove(pos);
                 break;
             }
         }
@@ -78,5 +83,23 @@ public class Locations {
         HashSet<String> users = this.currentPositions.get(pos);
         if (users == null) return 0;
         else return users.size();
+    }
+
+    public void serialize(String filepath) throws IOException {
+        FileOutputStream fos = new FileOutputStream(filepath);
+        ObjectOutputStream oos = new ObjectOutputStream(fos);
+        oos.writeObject(this);
+        oos.close();
+        fos.close();
+    }
+
+    public static Locations deserialize(String filepath) throws IOException, ClassNotFoundException {
+        FileInputStream fis = new FileInputStream(filepath);
+        ObjectInputStream ois = new ObjectInputStream(fis);
+        Locations locations = (Locations) ois.readObject();
+        ois.close();
+        fis.close();
+        locations.currentPositions = new HashMap<>();
+        return locations;
     }
 }

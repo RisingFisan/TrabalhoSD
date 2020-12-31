@@ -13,23 +13,21 @@ public class Server {
     public static void main(String[] args) throws Exception {
         ServerSocket ss = new ServerSocket(12345);
 
+        final Accounts accounts;
+        final Locations locations;
+
         File f = new File("accounts.ser");
-        if(!f.exists()) {
-            FileOutputStream fos = new FileOutputStream("accounts.ser");
-            ObjectOutputStream oos = new ObjectOutputStream(fos);
-            oos.writeObject(new Accounts());
-            oos.close();
-            fos.close();
-        }
-        FileInputStream fis = new FileInputStream("accounts.ser");
-        ObjectInputStream ois = new ObjectInputStream(fis);
+        if(!f.exists())
+            accounts = new Accounts();
+        else
+            accounts = Accounts.deserialize("accounts.ser");
 
-        Accounts accounts = (Accounts) ois.readObject();
+        f = new File("locations.ser");
+        if(!f.exists())
+            locations = new Locations();
+        else
+            locations = Locations.deserialize("locations.ser");
 
-        ois.close();
-        fis.close();
-
-        Locations locations = new Locations();
         ReentrantLock alarmsLock = new ReentrantLock();
         HashMap<Locations.Position, HashSet<Condition>> alarms = new HashMap<>();
 
@@ -82,22 +80,35 @@ public class Server {
                             System.out.println("User location update.");
                             String[] coordinates = new String(frame.data).split(" ");
                             Locations.Position pos = new Locations.Position(Integer.parseInt(coordinates[0]), Integer.parseInt(coordinates[1]));
-                            Locations.Position oldPos = locations.moveUser(frame.username, pos);
-                            if (locations.usersAtPos(oldPos) == 0)
-                                alarmsLock.lock();
+
+                            locations.l.writeLock().lock();
+                            try {
+                                Locations.Position oldPos = locations.moveUser(frame.username, pos);
+                                if (locations.usersAtPos(oldPos) == 0)
+                                    alarmsLock.lock();
                                 try {
                                     for (Condition cond : alarms.getOrDefault(oldPos, new HashSet<>()))
                                         cond.signalAll();
-                                }
-                                finally {
+                                } finally {
                                     alarmsLock.unlock();
                                 }
+                            }
+                            finally {
+                                locations.l.writeLock().unlock();
+                            }
                             System.out.println(frame.username + " is now at location " + pos);
                         }
                         else if (frame.tag == 3) {
                             System.out.println("Location probing request.");
                             Locations.Position pos = Locations.Position.fromByteArray(frame.data);
-                            int numUsers = locations.usersAtPos(pos);
+                            int numUsers;
+                            locations.l.readLock().lock();
+                            try {
+                                numUsers = locations.usersAtPos(pos);
+                            }
+                            finally {
+                                locations.l.readLock().unlock();
+                            }
                             c.send(3, "", String.valueOf(numUsers).getBytes());
                         }
                         else if (frame.tag == 30) {
@@ -107,7 +118,17 @@ public class Server {
                                 alarmsLock.lock();
                                 try {
                                     alarms.computeIfAbsent(pos, (p) -> new HashSet<>()).add(cond);
-                                    while (locations.usersAtPos(pos) > 0) {
+                                    while (true) {
+                                        int nUsers;
+                                        locations.l.readLock().lock();
+                                        try {
+                                            nUsers = locations.usersAtPos(pos);
+                                        }
+                                        finally {
+                                            locations.l.readLock().unlock();
+                                        }
+                                        if(nUsers == 0)
+                                            break;
                                         cond.await();
                                     }
                                     c.send(30, "", new byte[1]);
