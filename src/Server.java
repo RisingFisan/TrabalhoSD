@@ -1,12 +1,11 @@
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.AbstractMap;
 import java.util.HashMap;
-import java.util.Map;
+import java.util.HashSet;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.BiFunction;
-import java.util.stream.Collectors;
+
 
 public class Server {
     final static int WORKERS_PER_CONNECTION = 5;
@@ -30,6 +29,10 @@ public class Server {
         ois.close();
         fis.close();
 
+        Locations locations = new Locations();
+        ReentrantLock alarmsLock = new ReentrantLock();
+        HashMap<Locations.Position, HashSet<Condition>> alarms = new HashMap<>();
+
         while(true) {
             Socket s = ss.accept();
             Connection c = new Connection(s);
@@ -38,7 +41,6 @@ public class Server {
                 try (c) {
                     while(true) {
                         Frame frame = c.receive();
-                        int tag = frame.tag;
 
                         if (frame.tag == 0) {
                             System.out.println("User log-in attempt.");
@@ -69,17 +71,62 @@ public class Server {
                                     c.send(1, "", "Error - email address already tied to an account.".getBytes());
                                 else {
                                     accounts.addAccount(email, password);
-                                    c.send(1, "", "Registration was successful!".getBytes());
+                                    accounts.serialize("accounts.ser");
+                                    c.send(frame.tag, "", "Registration was successful!".getBytes());
                                 }
                             } finally {
                                 accounts.l.writeLock().unlock();
                             }
-                            accounts.serialize("accounts.ser");
+                        }
+                        else if (frame.tag == 2) {
+                            System.out.println("User location update.");
+                            String[] coordinates = new String(frame.data).split(" ");
+                            Locations.Position pos = new Locations.Position(Integer.parseInt(coordinates[0]), Integer.parseInt(coordinates[1]));
+                            Locations.Position oldPos = locations.moveUser(frame.username, pos);
+                            if (locations.usersAtPos(oldPos) == 0)
+                                alarmsLock.lock();
+                                try {
+                                    for (Condition cond : alarms.getOrDefault(oldPos, new HashSet<>()))
+                                        cond.signalAll();
+                                }
+                                finally {
+                                    alarmsLock.unlock();
+                                }
+                            System.out.println(frame.username + " is now at location " + pos);
+                        }
+                        else if (frame.tag == 3) {
+                            System.out.println("Location probing request.");
+                            Locations.Position pos = Locations.Position.fromByteArray(frame.data);
+                            int numUsers = locations.usersAtPos(pos);
+                            c.send(3, "", String.valueOf(numUsers).getBytes());
+                        }
+                        else if (frame.tag == 30) {
+                            Locations.Position pos = Locations.Position.fromByteArray(frame.data);
+                            new Thread(() -> {
+                                Condition cond = alarmsLock.newCondition();
+                                alarmsLock.lock();
+                                try {
+                                    alarms.computeIfAbsent(pos, (p) -> new HashSet<>()).add(cond);
+                                    while (locations.usersAtPos(pos) > 0) {
+                                        cond.await();
+                                    }
+                                    c.send(30, "", new byte[1]);
+                                }
+                                catch (Exception ignored) {
+
+                                }
+                                finally {
+                                    alarmsLock.unlock();
+                                }
+                            }).start();
                         }
                     }
-                } catch (Exception ignored) { }
-            };
+                } catch (IOException ignored) {
 
+                }
+            };
+// Locations should have a Map that for each location (two coordinates, x and y) keeps a set of all the users (identified by their username) that are in that location.
+            // It should also have a history Map, similar to the first one, but instead of storing the current location it stores all of a user's locations.
             for (int i = 0; i < WORKERS_PER_CONNECTION; ++i)
                 new Thread(worker).start();
         }
