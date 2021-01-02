@@ -75,7 +75,6 @@ public class Locations implements Serializable{
         }
         this.currentPositions.computeIfAbsent(newPos, (pos) -> new HashSet<>()).add(username);
         this.history.computeIfAbsent(newPos, (pos) -> new ArrayList<>()).add(username);
-        System.out.println(currentPositions.toString());
         return oldPos;
     }
 

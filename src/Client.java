@@ -1,6 +1,7 @@
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.Socket;
+import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -8,6 +9,9 @@ public class Client {
     public static void main(String[] args) throws Exception {
         Socket s = new Socket("localhost", 12345);
         Demultiplexer m = new Demultiplexer(new Connection(s));
+
+        HashSet<Thread> alarms = new HashSet<>();
+
         m.start();
 
         BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
@@ -82,6 +86,7 @@ public class Client {
             String option = stdin.readLine();
             switch(option) {
                 case "0":
+                    m.send(99, username, new byte[0]);
                     exit = true;
                     break;
                 case "1":
@@ -115,7 +120,7 @@ public class Client {
                             String getAlarm = stdin.readLine();
                             if (getAlarm.equalsIgnoreCase("s") || getAlarm.equalsIgnoreCase("y")) {
                                 String finalUsername = username;
-                                new Thread(() -> {
+                                Thread alarm = new Thread(() -> {
                                     try {
                                         m.send(30, finalUsername, pos.toByteArray());
                                         byte[] r = m.receive(30);
@@ -123,7 +128,9 @@ public class Client {
                                             System.out.println("\n***A LOCALIZAÇÃO " + pos + " ENCONTRA-SE LIVRE***\n");
                                     }
                                     catch (Exception ignored) { }
-                                }).start();
+                                });
+                                alarms.add(alarm);
+                                alarm.start();
                             }
                         }
                     }
@@ -135,6 +142,9 @@ public class Client {
                     break;
             }
         }
+
+        for(Thread t : alarms)
+            t.join();
 
         m.close();
     }

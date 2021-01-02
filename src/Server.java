@@ -1,10 +1,14 @@
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 
 public class Server {
@@ -29,7 +33,7 @@ public class Server {
             locations = Locations.deserialize("locations.ser");
 
         ReentrantLock alarmsLock = new ReentrantLock();
-        HashMap<Locations.Position, HashSet<Condition>> alarms = new HashMap<>();
+        HashMap<Locations.Position, HashSet<AbstractMap.SimpleEntry<String,Condition>>> alarms = new HashMap<>();
 
         while(true) {
             Socket s = ss.accept();
@@ -53,11 +57,11 @@ public class Server {
                             }
                             if (stored_password != null) {
                                 if (stored_password.equals(password))
-                                    c.send(0, "", "Logged in successfully!".getBytes());
+                                    c.send(0, "", "Sessão iniciada com sucesso!".getBytes());
                                 else
-                                    c.send(0, "", "Error - wrong password.".getBytes());
+                                    c.send(0, "", "Erro - palavra-passe errada.".getBytes());
                             } else
-                                c.send(0, "", "Error - account does not exist.".getBytes());
+                                c.send(0, "", "Erro - conta não existe.".getBytes());
                         }
                         else if (frame.tag == 1) {
                             System.out.println("User registration attempt.");
@@ -66,11 +70,11 @@ public class Server {
                             accounts.l.writeLock().lock();
                             try {
                                 if(accounts.accountExists(email))
-                                    c.send(1, "", "Error - email address already tied to an account.".getBytes());
+                                    c.send(1, "", "Erro - endereço de email já pertence a uma conta.".getBytes());
                                 else {
                                     accounts.addAccount(email, password);
                                     accounts.serialize("accounts.ser");
-                                    c.send(frame.tag, "", "Registration was successful!".getBytes());
+                                    c.send(frame.tag, "", "Registo efetuado com sucesso!".getBytes());
                                 }
                             } finally {
                                 accounts.l.writeLock().unlock();
@@ -87,11 +91,14 @@ public class Server {
                                 if (locations.usersAtPos(oldPos) == 0)
                                     alarmsLock.lock();
                                 try {
-                                    for (Condition cond : alarms.getOrDefault(oldPos, new HashSet<>()))
-                                        cond.signalAll();
+                                    alarms.getOrDefault(oldPos, new HashSet<>())
+                                            .stream()
+                                            .map(AbstractMap.SimpleEntry::getValue)
+                                            .forEach(Condition::signalAll);
                                 } finally {
                                     alarmsLock.unlock();
                                 }
+                                locations.serialize("locations.ser");
                             }
                             finally {
                                 locations.l.writeLock().unlock();
@@ -117,7 +124,7 @@ public class Server {
                                 Condition cond = alarmsLock.newCondition();
                                 alarmsLock.lock();
                                 try {
-                                    alarms.computeIfAbsent(pos, (p) -> new HashSet<>()).add(cond);
+                                    alarms.computeIfAbsent(pos, (p) -> new HashSet<>()).add(new AbstractMap.SimpleEntry<>(frame.username, cond));
                                     while (true) {
                                         int nUsers;
                                         locations.l.readLock().lock();
@@ -127,11 +134,20 @@ public class Server {
                                         finally {
                                             locations.l.readLock().unlock();
                                         }
-                                        if(nUsers == 0)
+                                        if (! alarms.containsKey(pos) ||
+                                                alarms.get(pos)
+                                                        .stream()
+                                                        .map(AbstractMap.SimpleEntry::getKey)
+                                                        .noneMatch(s1 -> s1.equals(frame.username))) {
+                                            c.send(30, "", new byte[0]);
                                             break;
+                                        }
+                                        if(nUsers == 0) {
+                                            c.send(30, "", new byte[1]);
+                                            break;
+                                        }
                                         cond.await();
                                     }
-                                    c.send(30, "", new byte[1]);
                                 }
                                 catch (Exception ignored) {
 
@@ -141,13 +157,28 @@ public class Server {
                                 }
                             }).start();
                         }
+                        else if (frame.tag == 99) {
+                            if (frame.data.length > 0) {
+                                // Fill this with what the server should do if the user reports that they're sick.
+                            }
+                            alarmsLock.lock();
+                            try {
+                                for (HashSet<AbstractMap.SimpleEntry<String, Condition>> set : alarms.values()) {
+                                    Set<AbstractMap.SimpleEntry<String, Condition>> toRemove = set.stream().filter(e -> e.getKey().equals(frame.username)).collect(Collectors.toSet());
+                                    set.removeAll(toRemove);
+                                    toRemove.forEach(e -> e.getValue().signalAll());
+                                }
+                            }
+                            finally {
+                                alarmsLock.unlock();
+                            }
+                        }
                     }
                 } catch (IOException ignored) {
 
                 }
             };
-// Locations should have a Map that for each location (two coordinates, x and y) keeps a set of all the users (identified by their username) that are in that location.
-            // It should also have a history Map, similar to the first one, but instead of storing the current location it stores all of a user's locations.
+
             for (int i = 0; i < WORKERS_PER_CONNECTION; ++i)
                 new Thread(worker).start();
         }
