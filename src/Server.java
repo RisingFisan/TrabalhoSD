@@ -35,6 +35,13 @@ public class Server {
         ReentrantLock alarmsLock = new ReentrantLock();
         HashMap<Locations.Position, HashSet<AbstractMap.SimpleEntry<String,Condition>>> alarms = new HashMap<>();
 
+        ReentrantLock liuLock = new ReentrantLock();
+        HashSet<String> loggedInUsers = new HashSet<>();
+
+        ReentrantLock sickLock = new ReentrantLock();
+        Condition sickCondition = sickLock.newCondition();
+        HashSet<String> sickUsers = new HashSet<>();
+
         while(true) {
             Socket s = ss.accept();
             Connection c = new Connection(s);
@@ -42,6 +49,7 @@ public class Server {
             Runnable worker = () -> {
                 try (c) {
                     while(true) {
+                        boolean loggedIn = false;
                         Frame frame = c.receive();
 
                         if (frame.tag == 0) {
@@ -56,8 +64,13 @@ public class Server {
                                 accounts.l.readLock().unlock();
                             }
                             if (stored_password != null) {
-                                if (stored_password.equals(password))
+                                if (stored_password.equals(password)) {
                                     c.send(0, "", "Sessão iniciada com sucesso!".getBytes());
+                                    loggedIn = true;
+                                    liuLock.lock();
+                                    try { loggedInUsers.add(frame.username); }
+                                    finally { liuLock.unlock(); }
+                                }
                                 else
                                     c.send(0, "", "Erro - palavra-passe errada.".getBytes());
                             } else
@@ -75,6 +88,10 @@ public class Server {
                                     accounts.addAccount(email, password);
                                     accounts.serialize("accounts.ser");
                                     c.send(frame.tag, "", "Registo efetuado com sucesso!".getBytes());
+                                    loggedIn = true;
+                                    liuLock.lock();
+                                    try { loggedInUsers.add(frame.username); }
+                                    finally { liuLock.unlock(); }
                                 }
                             } finally {
                                 accounts.l.writeLock().unlock();
@@ -88,15 +105,16 @@ public class Server {
                             locations.l.writeLock().lock();
                             try {
                                 Locations.Position oldPos = locations.moveUser(frame.username, pos);
-                                if (locations.usersAtPos(oldPos) == 0)
+                                if (locations.usersAtPos(oldPos) == 0) {
                                     alarmsLock.lock();
-                                try {
-                                    alarms.getOrDefault(oldPos, new HashSet<>())
-                                            .stream()
-                                            .map(AbstractMap.SimpleEntry::getValue)
-                                            .forEach(Condition::signalAll);
-                                } finally {
-                                    alarmsLock.unlock();
+                                    try {
+                                        alarms.getOrDefault(oldPos, new HashSet<>())
+                                                .stream()
+                                                .map(AbstractMap.SimpleEntry::getValue)
+                                                .forEach(Condition::signalAll);
+                                    } finally {
+                                        alarmsLock.unlock();
+                                    }
                                 }
                                 locations.serialize("locations.ser");
                             }
@@ -134,11 +152,7 @@ public class Server {
                                         finally {
                                             locations.l.readLock().unlock();
                                         }
-                                        if (! alarms.containsKey(pos) ||
-                                                alarms.get(pos)
-                                                        .stream()
-                                                        .map(AbstractMap.SimpleEntry::getKey)
-                                                        .noneMatch(s1 -> s1.equals(frame.username))) {
+                                        if (! alarms.containsKey(pos) || ! loggedInUsers.contains(frame.username)) {
                                             c.send(30, "", new byte[0]);
                                             break;
                                         }
@@ -158,9 +172,24 @@ public class Server {
                             }).start();
                         }
                         else if (frame.tag == 99) {
-                            if (frame.data.length > 0) {
-                                // Fill this with what the server should do if the user reports that they're sick.
+                            liuLock.lock();
+                            try {
+                                loggedInUsers.remove(frame.username);
                             }
+                            finally {
+                                liuLock.unlock();
+                            }
+
+                            sickLock.lock();
+                            try {
+                                if (frame.data.length > 0)
+                                    sickUsers.add(frame.username);
+                                sickCondition.signalAll();
+                            }
+                            finally {
+                                sickLock.unlock();
+                            }
+
                             alarmsLock.lock();
                             try {
                                 for (HashSet<AbstractMap.SimpleEntry<String, Condition>> set : alarms.values()) {
@@ -172,6 +201,42 @@ public class Server {
                             finally {
                                 alarmsLock.unlock();
                             }
+                        }
+
+                        if (loggedIn) {
+                            new Thread(() -> {
+                                sickLock.lock();
+                                try {
+                                    while (true) {
+                                        liuLock.lock();
+                                        try {
+                                            if (!loggedInUsers.contains(frame.username)) {
+                                                c.send(112, "", new byte[0]);
+                                                break;
+                                            }
+                                        }
+                                        finally {
+                                            liuLock.unlock();
+                                        }
+                                        boolean sick = false;
+                                        for (String user : sickUsers) {
+                                            if (!user.equals(frame.username) && locations.wereInContact(user, frame.username)) {
+                                                sick = true;
+                                                break;
+                                            }
+                                        }
+                                        if (sick) {
+                                            c.send(112, "", new byte[1]);
+                                            break;
+                                        }
+                                        sickCondition.await();
+                                    }
+                                }
+                                catch (Exception ignored) { }
+                                finally {
+                                    sickLock.unlock();
+                                }
+                            }).start();
                         }
                     }
                 } catch (IOException ignored) {

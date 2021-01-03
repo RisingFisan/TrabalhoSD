@@ -71,9 +71,20 @@ public class Client {
             System.out.println("\nErro - localização inválida - tente novamente.");
         }
 
+        final String finalUsername = username;
+        Thread sickThread = new Thread(() -> {
+            try {
+                byte[] r = m.receive(112);
+                if(r.length == 1)
+                    System.out.println("\n***AVISO: ESTEVE EM CONTACTO COM UMA PESSOA INFETADA***\n");
+            }
+            catch (Exception ignored) { }
+        });
+        sickThread.start();
+
         boolean exit = false;
         while (!exit) {
-            System.out.print("***COVIDON'T***\n"
+            System.out.print("\n***COVIDON'T***\n"
                     + "\n"
                     + "O que pretende fazer?\n"
                     + "1) Deslocar-me.\n"
@@ -116,10 +127,9 @@ public class Client {
                         int response = Integer.parseInt(new String(m.receive(3)));
                         System.out.println("\nEstão " + response + " pessoas nesta localização.\n");
                         if (response > 0) {
-                            System.out.print("\nPretende receber uma notificação quando esta localização estiver vazia? [s/N] ");
+                            System.out.print("Pretende receber uma notificação quando esta localização estiver vazia? [s/N] ");
                             String getAlarm = stdin.readLine();
                             if (getAlarm.equalsIgnoreCase("s") || getAlarm.equalsIgnoreCase("y")) {
-                                String finalUsername = username;
                                 Thread alarm = new Thread(() -> {
                                     try {
                                         m.send(30, finalUsername, pos.toByteArray());
@@ -139,12 +149,15 @@ public class Client {
                     }
                     break;
                 case "3":
+                    m.send(99, username, new byte[1]);
+                    exit = true;
                     break;
             }
         }
 
         for(Thread t : alarms)
             t.join();
+        sickThread.join();
 
         m.close();
     }

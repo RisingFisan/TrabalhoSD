@@ -6,7 +6,7 @@ import java.util.regex.Pattern;
 
 public class Locations implements Serializable{
 
-    public static class Position {
+    public static class Position implements Serializable {
         public int x;
         public int y;
 
@@ -55,7 +55,7 @@ public class Locations implements Serializable{
     }
 
     private HashMap<Position, HashSet<String>> currentPositions;
-    private HashMap<Position, ArrayList<String>> history;
+    private HashMap<String, HashSet<Position>> history;
     public ReentrantReadWriteLock l = new ReentrantReadWriteLock();
 
     public Locations() {
@@ -74,7 +74,7 @@ public class Locations implements Serializable{
             }
         }
         this.currentPositions.computeIfAbsent(newPos, (pos) -> new HashSet<>()).add(username);
-        this.history.computeIfAbsent(newPos, (pos) -> new ArrayList<>()).add(username);
+        this.history.computeIfAbsent(username, (x) -> new HashSet<>()).add(newPos);
         return oldPos;
     }
 
@@ -82,6 +82,14 @@ public class Locations implements Serializable{
         HashSet<String> users = this.currentPositions.get(pos);
         if (users == null) return 0;
         else return users.size();
+    }
+
+    public boolean wereInContact(String user1, String user2) {
+        if (! history.containsKey(user1) || ! history.containsKey(user2))
+            return false;
+        HashSet<Position> commonPositions = history.get(user1);
+        commonPositions.retainAll(history.get(user2));
+        return commonPositions.size() > 0;
     }
 
     public void serialize(String filepath) throws IOException {
