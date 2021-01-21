@@ -1,14 +1,10 @@
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.AbstractMap;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 
 public class Server {
@@ -56,7 +52,7 @@ public class Server {
                             System.out.println("User log-in attempt.");
                             String email = frame.username;
                             String password = new String(frame.data);
-                            String stored_password = null;
+                            String stored_password;
                             accounts.l.readLock().lock();
                             try {
                                 stored_password = accounts.getPassword(email);
@@ -136,6 +132,21 @@ public class Server {
                             }
                             c.send(3, "", String.valueOf(numUsers).getBytes());
                         }
+                        else if (frame.tag == 10) {
+                            System.out.println("Location map request.");
+                            Map<Locations.Position, Set<String>> locationHistory;
+                            try {
+                                locations.l.readLock().lock();
+                                locationHistory = locations.getHistory();
+                            } finally { locations.l.readLock().unlock(); }
+                            System.out.println(locationHistory.toString());
+                            StringBuilder sb = new StringBuilder();
+                            for (Locations.Position pos : locationHistory.keySet()) {
+                                sb.append(String.format("%s: %d utilizadores estiveram aqui, %d dos quais doentes.\n",pos.toString(),locationHistory.get(pos).size(),
+                                        locationHistory.get(pos).stream().filter(sickUsers::contains).count()));
+                            }
+                            c.send(10,"", sb.toString().getBytes());
+                        }
                         else if (frame.tag == 30) {
                             Locations.Position pos = Locations.Position.fromByteArray(frame.data);
                             new Thread(() -> {
@@ -172,6 +183,7 @@ public class Server {
                             }).start();
                         }
                         else if (frame.tag == 99) {
+
                             liuLock.lock();
                             try {
                                 loggedInUsers.remove(frame.username);
@@ -244,9 +256,7 @@ public class Server {
                 }
             };
 
-            for (int i = 0; i < WORKERS_PER_CONNECTION; ++i)
-                new Thread(worker).start();
+            new Thread(worker).start();
         }
-
     }
 }

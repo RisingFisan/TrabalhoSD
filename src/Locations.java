@@ -1,8 +1,11 @@
+import javafx.geometry.Pos;
+
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 public class Locations implements Serializable{
 
@@ -13,6 +16,11 @@ public class Locations implements Serializable{
         public Position(int x, int y) {
             this.x = x;
             this.y = y;
+        }
+
+        public Position(Position pos) {
+            this.x = pos.x;
+            this.y = pos.y;
         }
 
         public Position(String line) throws IllegalStateException {
@@ -52,6 +60,8 @@ public class Locations implements Serializable{
         public String toString() {
             return String.format("(%d,%d)",this.x,this.y);
         }
+
+        public Position clone() { return new Position(this); }
     }
 
     private HashMap<Position, HashSet<String>> currentPositions;
@@ -74,7 +84,7 @@ public class Locations implements Serializable{
             }
         }
         this.currentPositions.computeIfAbsent(newPos, (pos) -> new HashSet<>()).add(username);
-        this.history.computeIfAbsent(username, (x) -> new HashSet<>()).add(newPos);
+        this.history.computeIfAbsent(username, (x) -> new HashSet<>()).add(new Position(newPos));
         return oldPos;
     }
 
@@ -87,9 +97,20 @@ public class Locations implements Serializable{
     public boolean wereInContact(String user1, String user2) {
         if (! history.containsKey(user1) || ! history.containsKey(user2))
             return false;
-        HashSet<Position> commonPositions = history.get(user1);
+        HashSet<Position> commonPositions = new HashSet<>(history.get(user1));
         commonPositions.retainAll(history.get(user2));
         return commonPositions.size() > 0;
+    }
+
+    public Map<Position,Set<String>> getHistory() {
+        System.out.println(history);
+        Map<Position,Set<String>> result = new HashMap<>();
+        for (String user : history.keySet()) {
+            for (Position pos : history.get(user)) {
+                result.computeIfAbsent(pos, e -> new HashSet<>()).add(user);
+            }
+        }
+        return result;
     }
 
     public void serialize(String filepath) throws IOException {

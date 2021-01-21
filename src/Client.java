@@ -1,6 +1,7 @@
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.Socket;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -90,6 +91,7 @@ public class Client {
                     + "1) Deslocar-me.\n"
                     + "2) Ver ocupação de uma dada localização.\n"
                     + "3) Indicar que estou doente.\n"
+                    + (username.startsWith("admin") ? "4) Obter mapa de utilizadores por localização.\n" : "")
                     + "\n"
                     + "0) Sair.\n"
                     + "\n"
@@ -152,6 +154,12 @@ public class Client {
                     m.send(99, username, new byte[1]);
                     exit = true;
                     break;
+                case "4":
+                    if (username.startsWith("admin")) {
+                        m.send(10, username, new byte[0]);
+                        String map = new String(m.receive(10));
+                        System.out.println(map);
+                    }
             }
         }
 

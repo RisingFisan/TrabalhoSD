@@ -8,9 +8,9 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class Demultiplexer {
 
-    private Connection c;
-    private ReentrantLock l = new ReentrantLock();
-    private Map<Integer, FrameValue> map = new HashMap<>();
+    private final Connection c;
+    private final ReentrantLock l = new ReentrantLock();
+    private final Map<Integer, FrameValue> map = new HashMap<>();
     private IOException exception = null;
 
     private class FrameValue {
@@ -23,7 +23,7 @@ public class Demultiplexer {
         }
     }
 
-    public Demultiplexer(Connection conn) throws IOException {
+    public Demultiplexer(Connection conn) {
         this.c = conn;
     }
 
