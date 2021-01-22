@@ -8,7 +8,6 @@ import java.util.stream.Collectors;
 
 
 public class Server {
-    final static int WORKERS_PER_CONNECTION = 5;
 
     public static void main(String[] args) throws Exception {
         ServerSocket ss = new ServerSocket(12345);
