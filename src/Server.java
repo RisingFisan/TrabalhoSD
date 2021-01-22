@@ -216,6 +216,10 @@ public class Server {
                         }
 
                         if (loggedIn) {
+                            try { sickLock.lock();
+                                sickUsers.remove(frame.username);
+                            } finally { sickLock.unlock(); }
+
                             new Thread(() -> {
                                 sickLock.lock();
                                 try {
