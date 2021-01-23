@@ -6,6 +6,7 @@ import java.util.Queue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
+/** Opera apenas no lado do cliente **/
 public class Demultiplexer {
 
     private final Connection c;

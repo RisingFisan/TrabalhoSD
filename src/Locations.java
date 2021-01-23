@@ -4,9 +4,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** Classe responsável pelo armazenamento de uma posição atual e histórico das mesmas **/
 public class Locations implements Serializable{
 
     public static class Position implements Serializable {
+        /** coordenadas **/
         public int x;
         public int y;
 
@@ -99,6 +101,7 @@ public class Locations implements Serializable{
         return commonPositions.size() > 0;
     }
 
+    /** Método que devolve histórico de posições **/
     public Map<Position,Set<String>> getHistory() {
         System.out.println(history);
         Map<Position,Set<String>> result = new HashMap<>();
@@ -110,6 +113,7 @@ public class Locations implements Serializable{
         return result;
     }
 
+    /** Serialização permite armazenar informações relativas às posições **/
     public void serialize(String filepath) throws IOException {
         FileOutputStream fos = new FileOutputStream(filepath);
         ObjectOutputStream oos = new ObjectOutputStream(fos);

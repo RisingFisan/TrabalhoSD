@@ -1,3 +1,4 @@
+/** Classe responsável pela representação de mensagens **/
 public class Frame {
     public final int tag;
     public final String username;

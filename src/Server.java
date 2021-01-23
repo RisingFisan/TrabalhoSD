@@ -6,15 +6,16 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
-
+/** Classe relativa ao servidor do programa **/
 public class Server {
 
     public static void main(String[] args) throws Exception {
-        ServerSocket ss = new ServerSocket(12345);
+        ServerSocket ss = new ServerSocket(12345); //socket tcp
 
         final Accounts accounts;
         final Locations locations;
 
+        /** Serialização das contas e localizações**/
         File f = new File("accounts.ser");
         if(!f.exists())
             accounts = new Accounts();
@@ -92,6 +93,7 @@ public class Server {
                                 accounts.l.writeLock().unlock();
                             }
                         }
+                        //Mudar localização
                         else if (frame.tag == 2) {
                             System.out.println("User location update.");
                             String[] coordinates = new String(frame.data).split(" ");
@@ -118,6 +120,7 @@ public class Server {
                             }
                             System.out.println(frame.username + " is now at location " + pos);
                         }
+                        //Saber ocupação de localização
                         else if (frame.tag == 3) {
                             System.out.println("Location probing request.");
                             Locations.Position pos = Locations.Position.fromByteArray(frame.data);
@@ -131,6 +134,8 @@ public class Server {
                             }
                             c.send(3, "", String.valueOf(numUsers).getBytes());
                         }
+
+                        //Pedido de mapa de localizações
                         else if (frame.tag == 10) {
                             System.out.println("Location map request.");
                             Map<Locations.Position, Set<String>> locationHistory;
@@ -146,6 +151,8 @@ public class Server {
                             }
                             c.send(10,"", sb.toString().getBytes());
                         }
+
+                        //Localização livre
                         else if (frame.tag == 30) {
                             Locations.Position pos = Locations.Position.fromByteArray(frame.data);
                             new Thread(() -> {
@@ -181,6 +188,7 @@ public class Server {
                                 }
                             }).start();
                         }
+                        //sair
                         else if (frame.tag == 99) {
 
                             liuLock.lock();

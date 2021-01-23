@@ -3,6 +3,9 @@ import java.net.Socket;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+/** Classe responsável por encaminhar mensagens recebidas através de socket associado, assim como converter dados recebidos por socket
+ *  em mensagens que o cliente e servidor conseguem ler **/
+
 public class Connection implements AutoCloseable {
 
     private final DataInputStream dis;

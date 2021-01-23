@@ -2,8 +2,10 @@ import java.io.*;
 import java.util.HashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+/** Classe responsável por armazenar dados relativos às contas de acesso dos clientes e iplementar métodos que as permitem consultas **/
+
 public class Accounts implements Serializable {
-    private final HashMap<String, String> credentialsMap;
+    private final HashMap<String, String> credentialsMap; /** Hashmap de email e password **/
     public ReentrantReadWriteLock l = new ReentrantReadWriteLock();
 
     public Accounts() {
@@ -21,7 +23,7 @@ public class Accounts implements Serializable {
     public boolean accountExists(String email) {
         return credentialsMap.containsKey(email);
     }
-
+ /** Serialização permite armazenar informações relativas à conta **/
     public void serialize(String filepath) throws IOException {
         FileOutputStream fos = new FileOutputStream(filepath);
         ObjectOutputStream oos = new ObjectOutputStream(fos);

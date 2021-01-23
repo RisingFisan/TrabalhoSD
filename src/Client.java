@@ -5,9 +5,10 @@ import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** Classe relativa ao utilizador do programa **/
 public class Client {
     public static void main(String[] args) throws Exception {
-        Socket s = new Socket("localhost", 12345);
+        Socket s = new Socket("localhost", 12345); /** socket TCP **/
         Demultiplexer m = new Demultiplexer(new Connection(s));
 
         HashSet<Thread> alarms = new HashSet<>();
@@ -18,6 +19,7 @@ public class Client {
 
         String username = null;
 
+        // Apresenta o menu que questiona se pretende registar ou iniciar sessão
         while (username == null) {
             System.out.print("***COVIDON'T***\n"
                            + "\n"
@@ -27,6 +29,7 @@ public class Client {
                            + "\n"
                            + "Insira o valor corresponde à operação desejada: ");
             String option = stdin.readLine();
+          //Caso pretenda iniciar sessão, tem que inserir email e password
             if(option.equals("1")) {
                 System.out.print("***INICIAR SESSÃO***\n"
                                 + "\n"
@@ -41,6 +44,8 @@ public class Client {
                 }
                 System.out.println("\n" + response + "\n");
             }
+
+            //Caso pretenda registar, tem que inseerir email e password
             else if (option.equals("2")) {
                 System.out.print("***REGISTAR NOVA CONTA***\n"
                         + "\n"
@@ -57,6 +62,7 @@ public class Client {
             }
         }
 
+        //Inserir localização atual
         while (true) {
             System.out.print("***COVIDON'T***\n"
                     + "\n"
@@ -71,6 +77,7 @@ public class Client {
             System.out.println("\nErro - localização inválida - tente novamente.");
         }
 
+        //Aviso de contacto com pessoa infetada
         final String finalUsername = username;
         Thread sickThread = new Thread(() -> {
             try {
@@ -83,6 +90,8 @@ public class Client {
         sickThread.start();
 
         boolean exit = false;
+
+        //Menu onde se questiona o que se pretende fazer, opções: deslocar, ver ocupação de localização, avisar servidor que está doente, ou sair
         while (!exit) {
             System.out.print("\n***COVIDON'T***\n"
                     + "\n"
@@ -97,10 +106,12 @@ public class Client {
                     + "Insira o valor corresponde à operação desejada: ");
             String option = stdin.readLine();
             switch(option) {
+                //SAIR
                 case "0":
                     m.send(99, username, new byte[0]);
                     exit = true;
                     break;
+                //DESLOCAR
                 case "1":
                     while (true) {
                         System.out.print("***DESLOCAÇÃO***\n"
@@ -117,6 +128,7 @@ public class Client {
                         }
                     }
                     break;
+                //VER OCUPAÇÃO DE LOCAL
                 case "2":
                     System.out.print("***OCUPAÇÃO DE UMA LOCALIZAÇÃO***\n"
                             + "\n"
@@ -149,10 +161,14 @@ public class Client {
                         System.out.println("\n" + e + "\n");
                     }
                     break;
+
+                //INDICAR QUE ESTÁ DOENTE
                 case "3":
                     m.send(99, username, new byte[1]);
                     exit = true;
                     break;
+
+                //OBTER MAPA CASO SEJA ADMIN
                 case "4":
                     if (username.startsWith("admin")) {
                         m.send(10, username, new byte[0]);
