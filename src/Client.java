@@ -69,13 +69,14 @@ public class Client {
                     + "\n"
                     + "Introduza a sua localização atual, no formato \"(x,y)\": ");
             String location = stdin.readLine().strip();
-            Pattern pattern = Pattern.compile("(\\d+)[\\s,]+(\\d+)");
-            Matcher matcher = pattern.matcher(location);
-            if (matcher.find()) {
-                m.send(2, username, String.format("%s %s", matcher.group(1), matcher.group(2)).getBytes());
+            try {
+                Locations.Position pos = new Locations.Position(location);
+                m.send(2, username, String.format("%d %d", pos.x, pos.y).getBytes());
                 break;
             }
-            System.out.println("\nErro - localização inválida - tente novamente.");
+            catch (IllegalStateException e) {
+                System.out.println("\nErro - localização inválida - tente novamente.");
+            }
         }
 
         final String finalUsername = username;
