@@ -5,6 +5,13 @@ import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+
+/**
+ * Client-side implementation of the program.
+ *
+ * Instance of <code>Server</code> must be running before running instance of <code>Client</code>.
+ * Multiple instances of this class can run at the same time.
+ */
 public class Client {
     public static void main(String[] args) throws Exception {
         Socket s = new Socket("localhost", 12345);

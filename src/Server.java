@@ -6,7 +6,11 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
-
+/**
+ * Server-side implementation of the program.
+ *
+ * Instance of <code>Server</code> must be running before running instance(s) of <code>Client</code>.
+ */
 public class Server {
 
     public static void main(String[] args) throws Exception {
@@ -15,6 +19,7 @@ public class Server {
         final Accounts accounts;
         final Locations locations;
 
+        /* If the server has been run before, attempts to fetch the accounts and location history from the previous run. */
         File f = new File("accounts.ser");
         if(!f.exists())
             accounts = new Accounts();
@@ -37,10 +42,12 @@ public class Server {
         Condition sickCondition = sickLock.newCondition();
         HashSet<String> sickUsers = new HashSet<>();
 
+        /* Every time a new Client tries to connect, accept that connection, run a worker to handle the client and go back to waiting for new clients. */
         while(true) {
             Socket s = ss.accept();
             Connection c = new Connection(s);
 
+            /* The worker responsible for handling a client's requests. */
             Runnable worker = () -> {
                 try (c) {
                     while(true) {
@@ -138,7 +145,7 @@ public class Server {
                                 locations.l.readLock().lock();
                                 locationHistory = locations.getHistory();
                             } finally { locations.l.readLock().unlock(); }
-                            System.out.println(locationHistory.toString());
+
                             StringBuilder sb = new StringBuilder();
                             for (Locations.Position pos : locationHistory.keySet()) {
                                 sb.append(String.format("%s: %d utilizadores estiveram aqui, %d dos quais doentes.\n",pos.toString(),locationHistory.get(pos).size(),
@@ -148,6 +155,7 @@ public class Server {
                         }
                         else if (frame.tag == 30) {
                             Locations.Position pos = Locations.Position.fromByteArray(frame.data);
+                            System.out.println("New alarm request for position " + pos.toString() + ".");
                             new Thread(() -> {
                                 Condition cond = alarmsLock.newCondition();
                                 alarmsLock.lock();
