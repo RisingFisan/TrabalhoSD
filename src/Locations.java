@@ -127,7 +127,6 @@ public class Locations implements Serializable{
      * @return a <code>Map</code> associating each position with the users who passed through that location.
      */
     public Map<Position,Set<String>> getHistory() {
-        System.out.println(history);
         Map<Position,Set<String>> result = new HashMap<>();
         for (String user : history.keySet()) {
             for (Position pos : history.get(user)) {

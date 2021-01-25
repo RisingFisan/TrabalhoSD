@@ -123,7 +123,7 @@ public class Server {
                             finally {
                                 locations.l.writeLock().unlock();
                             }
-                            System.out.println(frame.username + " is now at location " + pos);
+                            System.out.println(frame.username + " is now at location " + pos + ".");
                         }
                         else if (frame.tag == 3) {
                             System.out.println("Location probing request.");

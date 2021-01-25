@@ -84,7 +84,7 @@ public class Client {
             try {
                 byte[] r = m.receive(112);
                 if(r.length == 1)
-                    System.out.println("\n***AVISO: ESTEVE EM CONTACTO COM UMA PESSOA INFETADA***\n");
+                    System.out.println("\n***AVISO: ESTEVE EM CONTACTO COM UMA PESSOA INFETADA***");
             }
             catch (Exception ignored) { }
         });
@@ -144,7 +144,7 @@ public class Client {
                                         m.send(30, finalUsername, pos.toByteArray());
                                         byte[] r = m.receive(30);
                                         if(r.length == 1)
-                                            System.out.println("\n***A LOCALIZAÇÃO " + pos + " ENCONTRA-SE LIVRE***\n");
+                                            System.out.println("\n***A LOCALIZAÇÃO " + pos + " ENCONTRA-SE LIVRE***");
                                     }
                                     catch (Exception ignored) { }
                                 });
